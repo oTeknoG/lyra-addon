@@ -7,60 +7,75 @@ import meteordevelopment.meteorclient.events.game.SendMessageEvent;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
 
-public class Uwuifier extends Module {
+public class TeleportNuker extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
-    private final Setting<Boolean> stutter = sgGeneral.add(new BoolSetting.Builder()
-        .name("add-stutter")
-        .description("Adds random stutter E.g. h-hi.")
-        .defaultValue(true)
-        .build()
-    );
-    private final Setting<Integer> stutterMax = sgGeneral.add(new IntSetting.Builder()
-        .name("stutter-limit")
-        .description("Max amount of random s-s-stutter")
-        .defaultValue(2)
+    private final Setting<Integer> areaSize = sgGeneral.add(new IntSetting.Builder()
+        .name("area-size")
+        .description("Size of the area to nuke.")
+        .defaultValue(10)
         .min(1)
-        .max(3)
-        .visible(stutter::get)
-        .build()
-    );
-    private final Setting<Boolean> faces = sgGeneral.add(new BoolSetting.Builder()
-        .name("add-faces")
-        .description("Adds random faces E.g. UwU, OwO.")
-        .defaultValue(true)
-        .build()
-    );
-    private final Setting<Boolean> expression = sgGeneral.add(new BoolSetting.Builder()
-        .name("add-expression")
-        .description("Adds random expressions E.g. meow, nya~.")
-        .defaultValue(true)
-        .build()
-    );
-    private final Setting<Boolean> actions = sgGeneral.add(new BoolSetting.Builder()
-        .name("add-actions")
-        .description("Adds random actions E.g. *cries*, *blushes*.")
-        .defaultValue(true)
+        .sliderMax(50)
         .build()
     );
 
-    public Uwuifier() {
-        super(Addon.CATEGORY, "uwuifier", "Uwuifies your messages.");
+    private final Setting<Integer> interval = sgGeneral.add(new IntSetting.Builder()
+        .name("interval")
+        .description("Interval between teleportations in ticks.")
+        .defaultValue(20)
+        .min(1)
+        .sliderMax(100)
+        .build()
+    );
+
+    private int tickCounter;
+
+    public TeleportNuker() {
+        super(Addon.CATEGORY, "teleport-nuker", "Teleports around and nukes large areas.");
     }
 
-    @EventHandler
-    private void onMessageSend(SendMessageEvent event) {
-        String message = Uwuify.uwuify(event.message, stutter.get(), stutterMax.get(), faces.get(), expression.get(), actions.get());
+    @Override
+    public void onActivate() {
+        tickCounter = 0;
+    }
 
+    @Override
+    public void onDeactivate() {
+        // Cleanup or reset any necessary state here
+    }
 
-        if (message.length() > 256) {
-            message = Uwuify.uwuify(event.message, false,  0,false, false, false);
+    @Override
+    public void onTick() {
+        if (++tickCounter >= interval.get()) {
+            tickCounter = 0;
+            teleportAndNuke();
         }
+    }
 
-        if (message.length() > 256) {
-            message = event.message;
+    private void teleportAndNuke() {
+        BlockPos playerPos = mc.player.getBlockPos();
+        for (int x = -areaSize.get(); x <= areaSize.get(); x++) {
+            for (int y = -areaSize.get(); y <= areaSize.get(); y++) {
+                for (int z = -areaSize.get(); z <= areaSize.get(); z++) {
+                    BlockPos targetPos = playerPos.add(x, y, z);
+                    if (mc.world.getBlockState(targetPos).getBlock() != Blocks.AIR) {
+                        teleportTo(targetPos);
+                        nuke(targetPos);
+                    }
+                }
+            }
         }
+    }
 
-        event.message = message;
+    private void teleportTo(BlockPos pos) {
+        mc.player.setPosition(Vec3d.ofCenter(pos));
+    }
+
+    private void nuke(BlockPos pos) {
+        BlockIterator.register(pos, pos.add(1, 1, 1), (blockPos, state) -> {
+            if (state.getBlock() != Blocks.AIR) {
+                BlockUtils.breakBlock(blockPos, true);
+            }
+        });
     }
 }
